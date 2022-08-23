@@ -64,7 +64,7 @@ contract BigBangGame is IERC721Receiver, Ownable{
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
-      require(recover == verifier, "Verification failed about stakeToken");
+      require(recover == verifier, "BBGame: Verification failed about importNft");
     }
 
     nft.safeTransferFrom(msg.sender, address(this), _nftId);
@@ -128,7 +128,7 @@ contract BigBangGame is IERC721Receiver, Ownable{
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
-      require(recover == verifier, "Verification failed about stakeToken");
+      require(recover == verifier, "BBGame: Verification failed about goldChangeToken");
     }
 
     nonce++;
@@ -157,16 +157,16 @@ contract BigBangGame is IERC721Receiver, Ownable{
       IERC20 _rewardToken = IERC20(_token);
 
       uint256 _balance = _rewardToken.balanceOf(address(this));
-      require(_amount <= _balance, "do not have enough token to reward");
+      require(_amount <= _balance, "BBGame: Do not have enough token to reward");
 
       uint256 _beforBalance = _rewardToken.balanceOf(_to);
       _rewardToken.transfer(_to, _amount);
 
-      require(_rewardToken.balanceOf(_to) == _beforBalance + _amount, "Invalid transfer");
+      require(_rewardToken.balanceOf(_to) == _beforBalance + _amount, "BBGame: Invalid transfer");
     } else {
 
       uint256 _balance = address(this).balance;
-      require(_amount <= _balance, "Do not have enough token to reward");
+      require(_amount <= _balance, "BBGame: Do not have enough token to reward");
 
       payable(_to).transfer(_amount);
     }
