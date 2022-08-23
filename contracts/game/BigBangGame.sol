@@ -7,6 +7,7 @@ import "./../openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./../openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./../openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./../nfts/BigBangNFT.sol";
+import "./../factory/BigBangNFTFactory.sol";
 
 contract BigBangGame is IERC721Receiver, Ownable{
 
@@ -14,37 +15,34 @@ contract BigBangGame is IERC721Receiver, Ownable{
   uint256 constant MULTIPLIER = 10**18;
 
   address public BBNft;
+  address public BBFactory;
   address public rewardToken;
   address public verifier;
   uint256 public ratio = 15000;       //Subscription Ratio: 15000 gold can exchange 1 token
   uint256 public typeId;
 
-  uint256 public nonce;
-
-  struct PlayerParams {
-    uint256 nftId;
-    uint256 stakeTime;
-  }
-
-  mapping(address => PlayerParams) public player;
-  mapping(uint256 => address) public BBOwners;
+  mapping(address => uint256) public totalStake;
+  mapping(address => mapping(uint256 => uint256)) public player;
   mapping(address => bool) public changeAllowed;
   mapping(uint256 => address) public token;
+  mapping(address => uint256) public nonce;
 
   event ImportNft(address indexed owner, uint256 indexed nftId, uint256 time);
-  event ExportNft(address indexed owner, uint256 indexed nftId, uint256 time);
+  event ExportNft(address indexed owner, uint256 indexed nftId, uint256 quality, uint256 image, uint256 time);
   event TokenChangeGold(address indexed owner, uint256 indexed typeId, uint256 indexed tokenAmount, uint256 time);
   event GoldChangeToken(address indexed owner, uint256 typeId, uint256 indexed gold, uint256 indexed tokenAmount, uint256 time);
   event Withdraw(address indexed tokenAddress, uint256 indexed tokenAmount, address indexed receiver, uint256 time);
   event AddToken(address indexed tokenAddress, uint256 indexed typeId, uint256 time);
+  event SetNftFactory(address indexed factoryAddress);
 
-  constructor(address _token, address _nft, address _verifier) public {
+  constructor(address _token, address _nft, address _factory, address _verifier) public {
     require(_token != address(0), "BBGame: Token can't be zero address");
     require(_nft != address(0), "BBGame: Nft can't be zero address");
     require(_verifier != address(0), "BBGame: Verifier can't be zero address");
 
     rewardToken = _token;
     BBNft     = _nft;
+    BBFactory = _factory;
     verifier    = _verifier;
 
     changeAllowed[_token] = true;
@@ -60,7 +58,7 @@ contract BigBangGame is IERC721Receiver, Ownable{
 
     {
       bytes memory prefix     = "\x19Ethereum Signed Message:\n32";
-      bytes32 message         = keccak256(abi.encodePacked(_nftId, msg.sender, address(this), nonce));
+      bytes32 message         = keccak256(abi.encodePacked(_nftId, msg.sender, address(this), nonce[msg.sender]));
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
@@ -69,32 +67,44 @@ contract BigBangGame is IERC721Receiver, Ownable{
 
     nft.safeTransferFrom(msg.sender, address(this), _nftId);
 
-    nonce++;
+    nonce[msg.sender]++;
 
-    PlayerParams storage _player = player[msg.sender];
-    _player.nftId = _nftId;
-    _player.stakeTime = block.timestamp;
-
-    BBOwners[_nftId] = msg.sender;
+    totalStake[msg.sender]++;
+    player[msg.sender][totalStake[msg.sender]] = _nftId;
 
     emit ImportNft(msg.sender, _nftId, block.timestamp);
   }
 
   //unstake mine NFT
-  function exportNft(uint256 _nftId) external {
-    require(BBOwners[_nftId] == msg.sender, "BBGame: Not the owner");
+  function exportNft(uint256 _quality, uint256 _image, uint8 _v, bytes32 _r, bytes32 _s) external {
 
     BigBangNFT nft = BigBangNFT(BBNft);
-    nft.safeTransferFrom(address(this), msg.sender, _nftId);
+    BigBangNFTFactory factory = BigBangNFTFactory(BBFactory);
 
-    PlayerParams storage _player = player[msg.sender];
-    delete _player.nftId;
-    delete _player.stakeTime;
+    //verify vrs
+    {
+      bytes memory prefix     = "\x19Ethereum Signed Message:\n32";
+      bytes32 message         = keccak256(abi.encodePacked(msg.sender, address(this), nonce[msg.sender], _quality, _image));
+      bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
+      address recover         = ecrecover(hash, _v, _r, _s);
 
-    delete BBOwners[_nftId];
+      require(recover == verifier, "BBGame: Verification failed about exportNft");
+    }
 
-    emit ExportNft(msg.sender, _nftId, block.timestamp);        
+    uint256 nftId = factory.mint(msg.sender, _quality, _image);
+    require(nftId > 0, "BBGame: mint NFT failed");
+
+    emit ExportNft(msg.sender, nftId, _quality, _image, block.timestamp);        
   }
+
+  // //unstake mine NFT
+  // function unstakeNft(uint256 _nftId) external {
+  //   require(BBOwners[_nftId] == msg.sender, "BBGame: Not the owner");
+
+  //   BigBangNFT nft = BigBangNFT(BBNft);
+  //   nft.safeTransferFrom(address(this), msg.sender, _nftId);
+        
+  // }
 
   //Exchange tokens for gold coins
   function tokenChangeGold(uint256 _typeId, uint256 _amount) external {
@@ -120,18 +130,16 @@ contract BigBangGame is IERC721Receiver, Ownable{
         chainId := chainid()
     }
 
-    PlayerParams storage _player = player[msg.sender];
-
     {
       bytes memory prefix     = "\x19Ethereum Signed Message:\n32";
-      bytes32 message         = keccak256(abi.encodePacked(_gold, msg.sender, nonce, address(this), chainId));
+      bytes32 message         = keccak256(abi.encodePacked(_gold, msg.sender, nonce[msg.sender], address(this), chainId));
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
       require(recover == verifier, "BBGame: Verification failed about goldChangeToken");
     }
 
-    nonce++;
+    nonce[msg.sender]++;
 
     uint256 _tokenAmount = _gold * MULTIPLIER / ratio;
     _safeTransfer(token[_typeId], msg.sender, _tokenAmount);
@@ -210,6 +218,14 @@ contract BigBangGame is IERC721Receiver, Ownable{
   function setScale(uint256 _ratio) public onlyOwner {
     require(_ratio > 0, "BBGame: Ratio must greater than zero");
     ratio = _ratio;
+  }
+
+  // the nft factory should give a permission on it's own side to this contract too.
+  function setNftFactory(address _factoryAddress) external onlyOwner {
+    require(_factoryAddress != address(0), "Profit Circus: Nft Factory address can not be be zero");
+    BigBangNFTFactory BBFactory = BigBangNFTFactory(_factoryAddress);
+
+    emit SetNftFactory(_factoryAddress);      
   }
   
 }
