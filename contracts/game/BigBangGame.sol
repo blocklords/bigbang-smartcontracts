@@ -33,8 +33,8 @@ contract BigBangGame is IERC721Receiver, Ownable{
 
   event ImportNft(address indexed owner, uint256 indexed nftId, uint256 time);
   event ExportNft(address indexed owner, uint256 indexed nftId, uint256 time);
-  event TokenChangeGold(address indexed owner, uint256 indexed tokenAmount, uint256 time);
-  event GoldChangeToken(address indexed owner, uint256 indexed gold, uint256 indexed tokenAmount, uint256 time);
+  event TokenChangeGold(address indexed owner, uint256 indexed typeId, uint256 indexed tokenAmount, uint256 time);
+  event GoldChangeToken(address indexed owner, uint256 typeId, uint256 indexed gold, uint256 indexed tokenAmount, uint256 time);
   event Withdraw(address indexed tokenAddress, uint256 indexed tokenAmount, address indexed receiver, uint256 time);
   event AddToken(address indexed tokenAddress, uint256 indexed typeId, uint256 time);
 
@@ -106,13 +106,14 @@ contract BigBangGame is IERC721Receiver, Ownable{
     
     _token.transferFrom(msg.sender, address(this), _amount);
 
-    emit TokenChangeGold(msg.sender, _amount, block.timestamp);     
+    emit TokenChangeGold(msg.sender, _typeId, _amount, block.timestamp);     
   }
 
 
   //Exchange  gold coins for tokens
-  function goldChangeToken(uint256 _gold, uint8 _v, bytes32 _r, bytes32 _s) external {
+  function goldChangeToken(uint256 _gold, uint256 _typeId, uint8 _v, bytes32 _r, bytes32 _s) external {
     require(_gold > 0, "BBGame: The exchange amount must greater than zero");
+    require(checkToken(_typeId), "BBGame: Do not have this token type");
 
     uint256 chainId;   
     assembly {
@@ -133,9 +134,9 @@ contract BigBangGame is IERC721Receiver, Ownable{
     nonce++;
 
     uint256 _tokenAmount = _gold * MULTIPLIER / ratio;
-    _safeTransfer(token[0], msg.sender, _tokenAmount);
+    _safeTransfer(token[_typeId], msg.sender, _tokenAmount);
 
-    emit GoldChangeToken(msg.sender, _gold, _tokenAmount, block.timestamp);  
+    emit GoldChangeToken(msg.sender, _typeId, _gold, _tokenAmount, block.timestamp);  
 
   }
 
