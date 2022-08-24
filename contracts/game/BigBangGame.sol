@@ -16,7 +16,6 @@ contract BigBangGame is IERC721Receiver, Ownable{
 
   address public BBNft;
   address public BBFactory;
-  address public rewardToken;
   address public verifier;
   uint256 public ratio = 15000;       //Subscription Ratio: 15000 gold can exchange 1 token
   uint256 public typeId;
@@ -40,7 +39,6 @@ contract BigBangGame is IERC721Receiver, Ownable{
     require(_nft != address(0), "BBGame: Nft can't be zero address");
     require(_verifier != address(0), "BBGame: Verifier can't be zero address");
 
-    rewardToken = _token;
     BBNft     = _nft;
     BBFactory = _factory;
     verifier    = _verifier;
