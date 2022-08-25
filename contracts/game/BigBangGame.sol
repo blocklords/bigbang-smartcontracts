@@ -25,9 +25,10 @@ contract BigBangGame is IERC721Receiver, Ownable{
   mapping(address => bool) public changeAllowed;
   mapping(uint256 => address) public token;
   mapping(address => uint256) public nonce;
+  mapping(uint256 => address) public nftOwner;
 
-  event ImportNft(address indexed owner, uint256 indexed nftId, uint256 time);
-  event ExportNft(address indexed owner, uint256 indexed nftId, uint256 quality, uint256 image, uint256 time);
+  event ImportNft(uint256 id, address indexed owner, uint256 indexed nftId, uint256 time);
+  event ExportNft(uint256 id, address indexed owner, uint256 indexed nftId, uint256 quality, uint256 image, uint256 time);
   event TokenChangeGold(address indexed owner, uint256 indexed typeId, uint256 indexed tokenAmount, uint256 time);
   event GoldChangeToken(address indexed owner, uint256 typeId, uint256 indexed gold, uint256 indexed tokenAmount, uint256 time);
   event Withdraw(address indexed tokenAddress, uint256 indexed tokenAmount, address indexed receiver, uint256 time);
@@ -48,15 +49,17 @@ contract BigBangGame is IERC721Receiver, Ownable{
   }
 
   //stake mine NFT
-  function importNft(uint256 _nftId, uint8 _v, bytes32 _r, bytes32 _s) external {
+  function importNft(uint256 _id, uint256 _nftId, uint8 _v, bytes32 _r, bytes32 _s) external {
+    require(_id > 0, "BBGame: Id invalid");
     require(_nftId > 0, "BBGame: nft Id invalid");
+    require(!(player[msg.sender][_id] > 0), "BBGame: This NFT has been saved");
 
     BigBangNFT nft = BigBangNFT(BBNft);
     require(nft.ownerOf(_nftId) == msg.sender, "BBGame: Not BBNft owner");
 
     {
       bytes memory prefix     = "\x19Ethereum Signed Message:\n32";
-      bytes32 message         = keccak256(abi.encodePacked(_nftId, msg.sender, address(this), nonce[msg.sender]));
+      bytes32 message         = keccak256(abi.encodePacked(_id, _nftId, msg.sender, address(this), nonce[msg.sender]));
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
@@ -66,43 +69,47 @@ contract BigBangGame is IERC721Receiver, Ownable{
     nft.safeTransferFrom(msg.sender, address(this), _nftId);
 
     nonce[msg.sender]++;
-
+    player[msg.sender][_id] = _nftId;
     totalStake[msg.sender]++;
-    player[msg.sender][totalStake[msg.sender]] = _nftId;
+    nftOwner[_id] = msg.sender;
 
-    emit ImportNft(msg.sender, _nftId, block.timestamp);
+    emit ImportNft(_id, msg.sender, _nftId, block.timestamp);
   }
 
   //unstake mine NFT
-  function exportNft(uint256 _quality, uint256 _image, uint8 _v, bytes32 _r, bytes32 _s) external {
-
+  function exportNft(uint256 _id, uint256 _quality, uint256 _image, uint8 _v, bytes32 _r, bytes32 _s) external {
     BigBangNFT nft = BigBangNFT(BBNft);
     BigBangNFTFactory factory = BigBangNFTFactory(BBFactory);
 
+    uint256 nftId = 0;
     //verify vrs
     {
       bytes memory prefix     = "\x19Ethereum Signed Message:\n32";
-      bytes32 message         = keccak256(abi.encodePacked(msg.sender, address(this), nonce[msg.sender], _quality, _image));
+      bytes32 message         = keccak256(abi.encodePacked(_id, msg.sender, address(this), nonce[msg.sender], _quality, _image));
       bytes32 hash            = keccak256(abi.encodePacked(prefix, message));
       address recover         = ecrecover(hash, _v, _r, _s);
 
       require(recover == verifier, "BBGame: Verification failed about exportNft");
     }
 
-    uint256 nftId = factory.mint(msg.sender, _quality, _image);
-    require(nftId > 0, "BBGame: mint NFT failed");
+    if(player[msg.sender][_id] > 0){
+      require(nftOwner[_id] == msg.sender, "BBGame: Not the owner");
 
-    emit ExportNft(msg.sender, nftId, _quality, _image, block.timestamp);        
+      nft.safeTransferFrom(address(this), msg.sender, player[msg.sender][_id]);
+
+      delete player[msg.sender][_id];
+      totalStake[msg.sender]--;
+
+    } else {
+      nftId = factory.mint(msg.sender, _quality, _image);
+
+      require(nftId > 0, "BBGame: mint NFT failed");
+    }
+
+    nonce[msg.sender]++;
+
+    emit ExportNft(_id, msg.sender, nftId, _quality, _image, block.timestamp);        
   }
-
-  // //unstake mine NFT
-  // function unstakeNft(uint256 _nftId) external {
-  //   require(BBOwners[_nftId] == msg.sender, "BBGame: Not the owner");
-
-  //   BigBangNFT nft = BigBangNFT(BBNft);
-  //   nft.safeTransferFrom(address(this), msg.sender, _nftId);
-        
-  // }
 
   //Exchange tokens for gold coins
   function tokenChangeGold(uint256 _typeId, uint256 _amount) external {
