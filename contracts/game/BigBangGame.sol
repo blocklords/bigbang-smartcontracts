@@ -36,7 +36,6 @@ contract BigBangGame is IERC721Receiver, Ownable{
   event SetNftFactory(address indexed factoryAddress);
 
   constructor(address _token, address _nft, address _factory, address _verifier) public {
-    require(_token != address(0), "BBGame: Token can't be zero address");
     require(_nft != address(0), "BBGame: Nft can't be zero address");
     require(_verifier != address(0), "BBGame: Verifier can't be zero address");
 
@@ -210,7 +209,6 @@ contract BigBangGame is IERC721Receiver, Ownable{
 
   //Add tokens that can be exchanged for gold
   function addToken(address _token) public onlyOwner {
-    require(_token != address(0), "BBGame: Token can't be zero address");
     require(!changeAllowed[_token], "BBGame: This token is exist");
 
     changeAllowed[_token] = true;
