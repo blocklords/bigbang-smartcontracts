@@ -21,10 +21,13 @@ contract BigBangNFTFactory is AccessControl {
     bytes32 public constant GENERATOR_ROLE = keccak256("GENERATOR");
 
     BigBangNFT private nft;
+    address private owner;
     
     constructor(address _nft) public {
+       require(_nft != address(0), "NFT Factory: NFT can't be zero address");
 	    nft = BigBangNFT(_nft);
 	    _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+       owner = msg.sender;
     }
 
     //--------------------------------------------------
@@ -32,8 +35,9 @@ contract BigBangNFTFactory is AccessControl {
     //--------------------------------------------------
 
    function mint(address _owner, uint256 _quality, uint256 _image) public onlyGenerator returns(uint256) {
-	  require (_quality > 0 && _quality < 6, "NFT Factory: invalid quality");
-	  return nft.mint(_owner, _quality, _image);
+      require(_owner != address(0), "NFT Factory: Owner can't be zero address");
+	   require (_quality > 0 && _quality < 6, "NFT Factory: invalid quality");
+	   return nft.mint(_owner, _quality, _image);
    }
     
     //--------------------------------------------------
@@ -52,6 +56,7 @@ contract BigBangNFTFactory is AccessControl {
    /// @dev Remove oneself from the admin role.
    function renounceAdmin() public virtual
    {
+      require(owner != msg.sender, "NFT Factory: owner can not call this method");
 	  renounceRole(DEFAULT_ADMIN_ROLE, msg.sender);
    }
 
