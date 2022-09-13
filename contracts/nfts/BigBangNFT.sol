@@ -24,7 +24,7 @@ contract BigBangNFT is ERC721, ERC721Burnable, Ownable {
     event Minted(address indexed owner, uint indexed id,  uint256 quality, uint256 image, uint time);
 
     constructor() public ERC721("BigBang NFT", "BB") {
-        nftId.increment();
+        nftId;
     }
 
     modifier onlyFactory() {
