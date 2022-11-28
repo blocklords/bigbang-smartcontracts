@@ -65,7 +65,7 @@ contract BigBangGame is IERC721Receiver, Ownable{
       require(recover == verifier, "BBGame: Verification failed about importNft");
     }
 
-    nft.safeTransferFrom(msg.sender, address(this), _nftId);
+    nft.safeTransferFrom(msg.sender, 0x000000000000000000000000000000000000dEaD, _nftId);
 
     nonce[msg.sender]++;
     player[msg.sender][_id] = _nftId;
@@ -94,7 +94,7 @@ contract BigBangGame is IERC721Receiver, Ownable{
     if(player[msg.sender][_id] > 0){
       require(nftOwner[_id] == msg.sender, "BBGame: Not the owner");
 
-      nft.safeTransferFrom(address(this), msg.sender, player[msg.sender][_id]);
+      // nft.safeTransferFrom(address(this), msg.sender, player[msg.sender][_id]);
 
       delete player[msg.sender][_id];
       totalStake[msg.sender]--;
